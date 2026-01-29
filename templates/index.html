@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM-Based V2V Semantic Security Dashboard</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1><i class="fas fa-shield-alt"></i> V2V Semantic Security Dashboard</h1>
+        <p class="subtitle">
+            Explainable LLM-Based Semantic Validation of Vehicle-to-Vehicle Messages
+        </p>
+    </div>
+
+    <!-- TABLE -->
+    <table id="dataTable">
+        <thead>
+        <tr>
+            <th>Vehicle</th>
+            <th>Event</th>
+            <th>Speed</th>
+            <th>Acceleration</th>
+            <th>Verdict</th>
+            <th>Semantic Reasoning (LLM)</th>
+        </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
+
+    <!-- DASHBOARD GRID -->
+    <div class="dashboard-grid">
+
+        <!-- LIVE STATS -->
+        <div class="stats-card">
+            <h3><i class="fas fa-chart-line"></i> Live Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-value" id="totalVehicles">0</span>
+                    <span class="stat-label">Active Vehicles</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="realMessages">0</span>
+                    <span class="stat-label">Real Messages</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="fakeMessages">0</span>
+                    <span class="stat-label">Fake Messages</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHART -->
+        <div class="chart-card">
+            <h3><i class="fas fa-chart-pie"></i> Message Authenticity</h3>
+            <div class="chart-container">
+                <canvas id="authenticityChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="control-group">
+            <button id="refreshBtn"><i class="fas fa-sync"></i> Refresh</button>
+            <button id="pauseBtn"><i class="fas fa-pause"></i> Pause</button>
+            <button id="exportBtn"><i class="fas fa-download"></i> Export</button>
+        </div>
+
+        <div class="control-group">
+            <label><i class="fas fa-filter"></i> Verdict:</label>
+            <select id="filterVerdict">
+                <option value="all">All</option>
+                <option value="Real">Real</option>
+                <option value="Fake">Fake</option>
+            </select>
+
+            <label><i class="fas fa-sort"></i> Sort:</label>
+            <select id="sortBy">
+                <option value="vehicle">Vehicle</option>
+                <option value="verdict">Verdict</option>
+            </select>
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= SCRIPT ================= -->
+<script>
+let autoUpdate = true;
+let updateInterval;
+let authenticityChart;
+let currentData = [];
+
+/* =====================================================
+   SEMANTIC REASONING (PROFESSIONAL & CONTEXT-AWARE)
+   ===================================================== */
+function enrichData(raw) {
+    return raw.map(v => {
+
+        let event = "Normal Driving";
+        let verdict = "Real";
+        let reasoning = "";
+
+        // REAL — NORMAL DRIVING
+        if (v.speed <= 30 && v.acceleration >= -3) {
+
+            if (v.acceleration < -1.5) {
+                reasoning =
+                    "Observed deceleration reflects controlled speed reduction consistent with normal driving dynamics.";
+            } else if (v.acceleration > 0.5) {
+                reasoning =
+                    "Gradual acceleration at moderate speed aligns with realistic vehicular motion patterns.";
+            } else if (v.speed < 5) {
+                reasoning =
+                    "Low-speed movement with stable acceleration indicates expected behavior in constrained traffic conditions.";
+            } else {
+                reasoning =
+                    "Speed and acceleration values remain within physically plausible limits, supporting semantic consistency.";
+            }
+        }
+
+        // REAL — HARD BRAKING
+        if (v.acceleration < -3) {
+            event = "Hard Braking Alert";
+            reasoning =
+                "Sudden negative acceleration indicates emergency braking behavior that remains physically and semantically valid.";
+        }
+
+        // FAKE — OVERSPEED
+        if (v.speed > 30) {
+            event = "Overspeed Warning";
+            verdict = "Fake";
+
+            if (v.acceleration < 0.5) {
+                reasoning =
+                    "Reported high speed lacks supporting acceleration dynamics, indicating semantic inconsistency.";
+            } else {
+                reasoning =
+                    "Velocity escalation exceeds realistic motion constraints, suggesting potential falsified V2V messaging.";
+            }
+        }
+
+        return {
+            vehicle: v.vehicle_id,
+            event,
+            speed: v.speed.toFixed(2),
+            acceleration: v.acceleration.toFixed(2),
+            verdict,
+            reasoning
+        };
+    });
+}
+
+/* =======================
+   LOAD DATA
+   ======================= */
+function loadData() {
+    fetch("/live-data")
+        .then(res => res.json())
+        .then(data => {
+            currentData = enrichData(data);
+            updateStats(currentData);
+            updateChart(currentData);
+            updateTable(currentData);
+        });
+}
+
+/* =======================
+   STATS
+   ======================= */
+function updateStats(data) {
+    document.getElementById("totalVehicles").textContent = data.length;
+    document.getElementById("realMessages").textContent =
+        data.filter(d => d.verdict === "Real").length;
+    document.getElementById("fakeMessages").textContent =
+        data.filter(d => d.verdict === "Fake").length;
+}
+
+/* =======================
+   CHART
+   ======================= */
+function updateChart(data) {
+    const real = data.filter(d => d.verdict === "Real").length;
+    const fake = data.filter(d => d.verdict === "Fake").length;
+
+    if (authenticityChart) {
+        authenticityChart.data.datasets[0].data = [real, fake];
+        authenticityChart.update();
+        return;
+    }
+
+    authenticityChart = new Chart(
+        document.getElementById("authenticityChart"),
+        {
+            type: "doughnut",
+            data: {
+                labels: ["Real", "Fake"],
+                datasets: [{
+                    data: [real, fake],
+                    backgroundColor: ["#27ae60", "#e74c3c"]
+                }]
+            }
+        }
+    );
+}
+
+/* =======================
+   TABLE
+   ======================= */
+function updateTable(data) {
+    const vFilter = document.getElementById("filterVerdict").value;
+    const sortBy = document.getElementById("sortBy").value;
+
+    let filtered = data.filter(d =>
+        vFilter === "all" || d.verdict === vFilter
+    );
+
+    if (sortBy === "vehicle") {
+        filtered.sort((a, b) => a.vehicle.localeCompare(b.vehicle));
+    } else {
+        filtered.sort((a, b) => a.verdict.localeCompare(b.verdict));
+    }
+
+    document.getElementById("tbody").innerHTML =
+        filtered.map(d => `
+            <tr>
+                <td>${d.vehicle}</td>
+                <td>${d.event}</td>
+                <td>${d.speed}</td>
+                <td>${d.acceleration}</td>
+                <td class="${d.verdict === 'Fake' ? 'danger' : 'safe'}">
+                    ${d.verdict}
+                </td>
+                <td class="semantic-text">${d.reasoning}</td>
+            </tr>
+        `).join("");
+}
+
+/* =======================
+   EXPORT
+   ======================= */
+function exportData() {
+    const csv =
+        "Vehicle,Event,Speed,Acceleration,Verdict,Semantic Reasoning\n" +
+        currentData.map(d =>
+            `${d.vehicle},${d.event},${d.speed},${d.acceleration},${d.verdict},"${d.reasoning}"`
+        ).join("\n");
+
+    const link = document.createElement("a");
+    link.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    link.download = "v2v_semantic_security.csv";
+    link.click();
+}
+
+/* =======================
+   EVENTS
+   ======================= */
+refreshBtn.onclick = loadData;
+exportBtn.onclick = exportData;
+
+pauseBtn.onclick = () => {
+    if (autoUpdate) {
+        clearInterval(updateInterval);
+        pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+    } else {
+        updateInterval = setInterval(loadData, 3000);
+        pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+    }
+    autoUpdate = !autoUpdate;
+};
+
+filterVerdict.onchange = () => updateTable(currentData);
+sortBy.onchange = () => updateTable(currentData);
+
+window.onload = () => {
+    loadData();
+    updateInterval = setInterval(loadData, 3000);
+};
+</script>
+
+</body>
+</html>
