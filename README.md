@@ -26,7 +26,7 @@ Chart.js
 
 Run
 pip install flask transformers
-python app.p
+python app.py
 
 Novelty
 
