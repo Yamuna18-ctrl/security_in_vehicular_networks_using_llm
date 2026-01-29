@@ -30,4 +30,4 @@ python app.py
 
 Novelty
 
-Semantic-level security using physics-aware validation and explainable LLM reasoning — no traditional ML training required.
+Semantic-level security using physics-aware validation and explainable LLM reasoning .
